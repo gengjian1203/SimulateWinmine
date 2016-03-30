@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include "afxwin.h"
 
 
 // CSimulateWinmineDlg 对话框
@@ -28,11 +29,16 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+
+public:
+	CComboBox m_comboLevel;
 public:
 	afx_msg void OnBnClickedButtonInit();
+	afx_msg void OnBnClickedButtonStart();
 
 // 自定义
 private:
+	CString m_strStatus[10];
 	//游戏的窗口句柄
 	HWND m_hGameHwnd;
 	//游戏的进程ID
@@ -51,7 +57,8 @@ private:
 	int m_nHeight;
 
 private:
-	bool ShowHandle(void);
+	bool SetWindowEnable(int nEnable);
+	bool ShowStatus(int nStatus);
 	bool ReadINI(void);
 	bool Init(void);
 	bool GetGameHwnd(void);
@@ -62,5 +69,7 @@ private:
 	bool RunAction(void);
 	bool ClickLeftButton(int nX, int nY);
 	bool ClickRightButton(int nX, int nY);
+
+public:
 
 };

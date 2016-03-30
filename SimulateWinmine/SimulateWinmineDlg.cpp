@@ -26,12 +26,14 @@ CSimulateWinmineDlg::CSimulateWinmineDlg(CWnd* pParent /*=NULL*/)
 void CSimulateWinmineDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_COMBO_LEVEL, m_comboLevel);
 }
 
 BEGIN_MESSAGE_MAP(CSimulateWinmineDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON_INIT, &CSimulateWinmineDlg::OnBnClickedButtonInit)
+	ON_BN_CLICKED(IDC_BUTTON_START, &CSimulateWinmineDlg::OnBnClickedButtonStart)
 END_MESSAGE_MAP()
 
 
@@ -92,31 +94,95 @@ void CSimulateWinmineDlg::OnBnClickedButtonInit()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	// 通过标题名和类名，获取游戏的窗口句柄
-	GetGameHwnd();
-	// 获取进程ID
-	GetGamePID();
-	// 注入游戏进程
-	OpenGameProcess();
-	// 获取游戏数据
-	m_nCount = ReadMemoryInt32(m_nAddCount);
-	m_nTime = ReadMemoryInt32(m_nAddTime);
-	m_nWidth = ReadMemoryInt32(m_nAddWidth);
-	m_nHeight = ReadMemoryInt32(m_nAddHeight);
+	if (GetGameHwnd())
+	{
+		// 获取进程ID
+		GetGamePID();
+		// 注入游戏进程
+		OpenGameProcess();
+		// 等待开始
+		ShowStatus(2);
+		// 更新界面
+		SetWindowEnable(1);
 
-	// 显示当前状态
-	ShowHandle();
+	}
+	else
+	{
+		// 未找到扫雷
+		ShowStatus(1);
+		// 更新界面
+		SetWindowEnable(0);
+	}
 
-	RunAction();
 }
 
-bool CSimulateWinmineDlg::ShowHandle(void)
+void CSimulateWinmineDlg::OnBnClickedButtonStart()
 {
-	CString strWnd;
+	// TODO: 在此添加控件通知处理程序代码
+	if (GetGameHwnd())
+	{
+		// 获取游戏数据
+		m_nCount = ReadMemoryInt32(m_nAddCount);
+		m_nTime = ReadMemoryInt32(m_nAddTime);
+		m_nWidth = ReadMemoryInt32(m_nAddWidth);
+		m_nHeight = ReadMemoryInt32(m_nAddHeight);
+		// 扫雷中……
+		ShowStatus(3);
+		if (RunAction())
+		{
+			// 扫雷成功
+			ShowStatus(4);
+		}
+		else
+		{
+			// 扫雷失败
+			ShowStatus(5);
+			// 更新界面
+			SetWindowEnable(0);
+		}
+	}
+	else
+	{
+		// 未找到扫雷
+		ShowStatus(1);
+		// 更新界面
+		SetWindowEnable(0);
+	}
 
-	strWnd.Format(_T("Hwnd:\t%d\nPID:\t%d\nhand:\t%d\nCount:\t%d\nTime:\t%d\nWidth:\t%d\nHeight:\t%d\n"), 
-		m_hGameHwnd, m_hGamePID, m_hGameHandle, 
-		m_nCount, m_nTime, m_nWidth, m_nHeight);
-	GetDlgItem(IDC_STATUS)->SetWindowTextW(strWnd);
+}
+
+bool CSimulateWinmineDlg::SetWindowEnable(int nEnable)
+{
+	if (1 == nEnable)
+	{
+		// 可开始扫雷
+		GetDlgItem(IDC_BUTTON_INIT)->EnableWindow(FALSE);
+		GetDlgItem(IDC_COMBO_LEVEL)->EnableWindow(TRUE);
+		GetDlgItem(IDC_BUTTON_START)->EnableWindow(TRUE);
+
+	}
+	else if (0 == nEnable)
+	{
+		// 不可开始扫雷
+		GetDlgItem(IDC_BUTTON_INIT)->EnableWindow(TRUE);
+		GetDlgItem(IDC_COMBO_LEVEL)->EnableWindow(FALSE);
+		GetDlgItem(IDC_BUTTON_START)->EnableWindow(FALSE);
+	}
+	else
+	{
+		;
+	}
+	return true;
+}
+
+bool CSimulateWinmineDlg::ShowStatus(int nStatus)
+{
+// 	CString strWnd;
+// 	strWnd.Format(_T("Hwnd:\t%d\nPID:\t%d\nhand:\t%d\nCount:\t%d\nTime:\t%d\nWidth:\t%d\nHeight:\t%d\n"), 
+// 		m_hGameHwnd, m_hGamePID, m_hGameHandle, 
+// 		m_nCount, m_nTime, m_nWidth, m_nHeight);
+	
+	GetDlgItem(IDC_STATUS)->SetWindowTextW(m_strStatus[nStatus]);
 	return true;
 }
 
@@ -128,21 +194,34 @@ bool CSimulateWinmineDlg::ReadINI(void)
 
 bool CSimulateWinmineDlg::Init(void)
 {
+	// 初始化提示信息
+	m_strStatus[0] = "【当前状态】等待初始化";
+	m_strStatus[1] = "【当前状态】未找到扫雷";
+	m_strStatus[2] = "【当前状态】等待开始";
+	m_strStatus[3] = "【当前状态】扫雷中……";
+	m_strStatus[4] = "【当前状态】扫雷完毕";
+	m_strStatus[5] = "异常错误，建议初始化";
+	m_strStatus[6] = "【当前状态】空闲";
+	m_strStatus[7] = "【当前状态】空闲";
+	m_strStatus[8] = "【当前状态】空闲";
+	m_strStatus[9] = "【当前状态】空闲";
 	// 初始化成员变量
 	m_hGameHwnd = 0x00;
 	m_hGamePID = 0x00;
 	m_hGameHandle = 0x00;
-
 	m_nAddCount = 0x01005330;
 	m_nAddTime = 0x0100579C;
 	m_nAddWidth = 0x01005334;
 	m_nAddHeight = 0x01005338;
 	m_nAddData = 0x01005360;
-
 	m_nCount = 0x00;
 	m_nTime = 0x00;
 	m_nWidth = 0x00;
 	m_nHeight = 0x00;
+	// 初始化控件
+	SetWindowEnable(0);
+	m_comboLevel.SetCurSel(2);
+
 	// 读取配置文件
 	ReadINI();
 	
@@ -155,10 +234,13 @@ bool CSimulateWinmineDlg::GetGameHwnd(void)
 	m_hGameHwnd = ::FindWindowW(_T("扫雷"), _T("扫雷"));
 	if (0x00 == m_hGameHwnd)
 	{
-		AfxMessageBox(_T("请打开扫雷应用程序"));
+		return false;
+	}
+	else
+	{
+		return true;
 	}
 
-	return true;
 }
 
 bool CSimulateWinmineDlg::GetGamePID(void)
@@ -199,6 +281,7 @@ bool CSimulateWinmineDlg::RunAction(void)
 {
 	CString strSign;
 	int nSign;
+	int nDelay = (3 - m_comboLevel.GetCurSel()) * 6;
 
 	for (int i = 0; i < m_nHeight; i++)
 	{
@@ -216,9 +299,10 @@ bool CSimulateWinmineDlg::RunAction(void)
 			} 
 			else
 			{
-				;
+				//return false;
+				
 			}
-			//Sleep(10);
+			Sleep(nDelay);
 		}
 	}
 
@@ -242,4 +326,6 @@ bool CSimulateWinmineDlg::ClickRightButton(int nX, int nY)
 
 	return true;
 }
+
+
 
