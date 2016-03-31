@@ -32,6 +32,8 @@ protected:
 
 public:
 	CComboBox m_comboLevel;
+	CComboBox m_comboVersion;
+
 public:
 	afx_msg void OnBnClickedButtonInit();
 	afx_msg void OnBnClickedButtonStart();
@@ -46,15 +48,17 @@ private:
 	//ÓÎÏ·µÄÊµÀý¾ä±ú
 	HANDLE m_hGameHandle;
 
-	int m_nAddCount;
-	int m_nAddTime;
-	int m_nAddWidth;
-	int m_nAddHeight;
-	int m_nAddData;
+	int m_nAddCount[3];
+	int m_nAddTime[3];
+	int m_nAddWidth[3];
+	int m_nAddHeight[3];
+	int m_nAddData[3];
 	int m_nCount;
 	int m_nTime;
 	int m_nWidth;
 	int m_nHeight;
+
+	int m_WinmineVersion;
 
 private:
 	bool SetWindowEnable(int nEnable);
@@ -63,6 +67,7 @@ private:
 	bool Init(void);
 	bool GetGameHwnd(void);
 	bool GetGamePID(void);
+	bool EnableDebugPrivilege(void);
 	bool OpenGameProcess(void);
 	int ReadMemoryByte(int nAddr);
 	int ReadMemoryInt32(int nAddr);

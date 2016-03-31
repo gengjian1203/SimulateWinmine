@@ -27,6 +27,7 @@ void CSimulateWinmineDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_COMBO_LEVEL, m_comboLevel);
+	DDX_Control(pDX, IDC_COMBO_VERSION, m_comboVersion);
 }
 
 BEGIN_MESSAGE_MAP(CSimulateWinmineDlg, CDialogEx)
@@ -99,12 +100,19 @@ void CSimulateWinmineDlg::OnBnClickedButtonInit()
 		// 获取进程ID
 		GetGamePID();
 		// 注入游戏进程
-		OpenGameProcess();
-		// 等待开始
-		ShowStatus(2);
-		// 更新界面
-		SetWindowEnable(1);
-
+		if (OpenGameProcess())
+		{
+			// 等待开始
+			ShowStatus(2);
+			// 更新界面
+			SetWindowEnable(1);
+		}
+		else
+		{
+			// 提示权限不足
+			ShowStatus(5);
+		}
+		
 	}
 	else
 	{
@@ -121,11 +129,13 @@ void CSimulateWinmineDlg::OnBnClickedButtonStart()
 	// TODO: 在此添加控件通知处理程序代码
 	if (GetGameHwnd())
 	{
+		// 获取
+		m_WinmineVersion = m_comboVersion.GetCurSel();
 		// 获取游戏数据
-		m_nCount = ReadMemoryInt32(m_nAddCount);
-		m_nTime = ReadMemoryInt32(m_nAddTime);
-		m_nWidth = ReadMemoryInt32(m_nAddWidth);
-		m_nHeight = ReadMemoryInt32(m_nAddHeight);
+		m_nCount = ReadMemoryInt32(m_nAddCount[m_WinmineVersion]);
+		m_nTime = ReadMemoryInt32(m_nAddTime[m_WinmineVersion]);
+		m_nWidth = ReadMemoryInt32(m_nAddWidth[m_WinmineVersion]);
+		m_nHeight = ReadMemoryInt32(m_nAddHeight[m_WinmineVersion]);
 		// 扫雷中……
 		ShowStatus(3);
 		if (RunAction())
@@ -177,12 +187,16 @@ bool CSimulateWinmineDlg::SetWindowEnable(int nEnable)
 
 bool CSimulateWinmineDlg::ShowStatus(int nStatus)
 {
-// 	CString strWnd;
-// 	strWnd.Format(_T("Hwnd:\t%d\nPID:\t%d\nhand:\t%d\nCount:\t%d\nTime:\t%d\nWidth:\t%d\nHeight:\t%d\n"), 
-// 		m_hGameHwnd, m_hGamePID, m_hGameHandle, 
-// 		m_nCount, m_nTime, m_nWidth, m_nHeight);
-	
+	CString strWnd;
+
 	GetDlgItem(IDC_STATUS)->SetWindowTextW(m_strStatus[nStatus]);
+// 	if (3 == nStatus)
+// 	{
+// 		strWnd.Format(_T("Hwnd:\t%d\nPID:\t%d\nhand:\t%d\nCount:\t%d\nTime:\t%d\nWidth:\t%d\nHeight:\t%d\n"), 
+// 			m_hGameHwnd, m_hGamePID, m_hGameHandle, 
+// 			m_nCount, m_nTime, m_nWidth, m_nHeight);
+// 		AfxMessageBox(strWnd);
+// 	}
 	return true;
 }
 
@@ -200,7 +214,7 @@ bool CSimulateWinmineDlg::Init(void)
 	m_strStatus[2] = "【当前状态】等待开始";
 	m_strStatus[3] = "【当前状态】扫雷中……";
 	m_strStatus[4] = "【当前状态】扫雷完毕";
-	m_strStatus[5] = "异常错误，建议初始化";
+	m_strStatus[5] = "本程序权限不足，抱歉";
 	m_strStatus[6] = "【当前状态】空闲";
 	m_strStatus[7] = "【当前状态】空闲";
 	m_strStatus[8] = "【当前状态】空闲";
@@ -209,17 +223,32 @@ bool CSimulateWinmineDlg::Init(void)
 	m_hGameHwnd = 0x00;
 	m_hGamePID = 0x00;
 	m_hGameHandle = 0x00;
-	m_nAddCount = 0x01005330;
-	m_nAddTime = 0x0100579C;
-	m_nAddWidth = 0x01005334;
-	m_nAddHeight = 0x01005338;
-	m_nAddData = 0x01005360;
+	// Ver4.1
+	m_nAddCount[0] = 0x01005330;
+	m_nAddTime[0] = 0x0100579C;
+	m_nAddWidth[0] = 0x01005334;
+	m_nAddHeight[0] = 0x01005338;
+	m_nAddData[0] = 0x01005360;
+	// Ver5.1
+	m_nAddCount[1] = 0x01005330;
+	m_nAddTime[1] = 0x0100579C;
+	m_nAddWidth[1] = 0x01005334;
+	m_nAddHeight[1] = 0x01005338;
+	m_nAddData[1] = 0x01005360;
+	// Ver6.1
+	m_nAddCount[2] = 0x01005330;
+	m_nAddTime[2] = 0x0100579C;
+	m_nAddWidth[2] = 0x01005334;
+	m_nAddHeight[2] = 0x01005338;
+	m_nAddData[2] = 0x01005360;
 	m_nCount = 0x00;
 	m_nTime = 0x00;
 	m_nWidth = 0x00;
 	m_nHeight = 0x00;
+	m_WinmineVersion = 1;
 	// 初始化控件
 	SetWindowEnable(0);
+	m_comboVersion.SetCurSel(1);
 	m_comboLevel.SetCurSel(2);
 
 	// 读取配置文件
@@ -251,11 +280,34 @@ bool CSimulateWinmineDlg::GetGamePID(void)
 	return true;
 }
 
+bool CSimulateWinmineDlg::EnableDebugPrivilege(void)
+{
+	HANDLE hToken;
+	bool fOk = false;
+	if(OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken))
+	{
+		TOKEN_PRIVILEGES tp;
+		tp.PrivilegeCount = 1;
+		LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tp.Privileges[0].Luid);
+		tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+		AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL);
+
+		fOk = (GetLastError() == ERROR_SUCCESS);
+		CloseHandle(hToken);
+	}
+	return fOk;
+}
 bool CSimulateWinmineDlg::OpenGameProcess(void)
 {
+	// 开启Debug权限
+	EnableDebugPrivilege();
 	//根据进程ID打开进程
 	m_hGameHandle = ::OpenProcess(PROCESS_ALL_ACCESS, false, m_hGamePID);
-
+	if (0x00 == m_hGameHandle)
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -287,7 +339,7 @@ bool CSimulateWinmineDlg::RunAction(void)
 	{
 		for (int j = 1; j <= m_nWidth; j++)
 		{
-			nSign = ReadMemoryByte(m_nAddData + i * 32 + j);
+			nSign = ReadMemoryByte(m_nAddData[m_WinmineVersion] + i * 32 + j);
 			// 143为雷，15为无雷
 			if (15 == nSign)
 			{
